@@ -10,3 +10,4 @@ Fonction à ajouter :
 [] - Calculer la valeur totale de l’inventaire
 [] - Supprimer un article de l’inventaire
 [] - Exporter l'inventaire JSON
+[] - Charger depuis JSON
