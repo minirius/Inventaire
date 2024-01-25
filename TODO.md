@@ -1,6 +1,6 @@
 Fonction primaire : 
 [] - Choisir le système de stockage (SQL)
-[] - Interface (HTML, CSS, JS)
+[] - Interface (Tkinter)
 
 Fonction à ajouter :
 [] - Ajouter des articles à l'inventaire
