@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "name": "Table",
+        "amount": 134,
+        "price": 15,
+        "category": "mobilier"
+    },
+    {
+        "id": 2,
+        "name": "Chaise",
+        "amount": 56,
+        "price": 50,
+        "category": "mobilier"
+    },
+    {
+        "id": 3,
+        "name": "Banc",
+        "amount": 800,
+        "price": 90,
+        "category": "mobilier"
+    },
+    {
+        "id": 4,
+        "name": "Banane",
+        "amount": 500,
+        "price": 2,
+        "category": "Nourriture"
+    }
+]

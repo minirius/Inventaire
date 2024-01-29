@@ -1,0 +1,16 @@
+[
+    {
+        "id":0,
+        "name":"test",
+        "amount":10,
+        "price":5,
+        "category":"food"
+    },
+    {
+        "id":1,
+        "name":"test2",
+        "amount":15,
+        "price":2,
+        "category":"thing"
+    }
+]
