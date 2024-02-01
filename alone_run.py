@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2 
 import qrcode
 from playsound import playsound
+import requests
 
 def checkJsonFormat(jsonFile):
     """
@@ -37,15 +38,15 @@ def ensureDatabase():
     global CON, CUR
 
     # Création du dossier /res s'il n'existe pas
-    Path(os.getcwd()+"/res").mkdir(parents=True, exist_ok=True)
+    Path(os.getcwd()+"/ressources").mkdir(parents=True, exist_ok=True)
 
     # Création du fichier database.db s'il n'existe pas
-    if(not exists("res/database.db")):
-        f = open("res/database.db", "x")
+    if(not exists("ressources/database.db")):
+        f = open("ressources/database.db", "x")
         f.close()
 
     # Création de la connection a la base de données en variable GLOBALE (tout le long du programme)
-    CON = sqlite3.connect("res/database.db")
+    CON = sqlite3.connect("ressources/database.db")
     CUR = CON.cursor()
 
     # Recherche de la table matable, qui stockera les données
@@ -346,11 +347,10 @@ class EditWindow(customtkinter.CTkToplevel):
     def qrcode(self):
         # Crée un code QR
         filepath = fd.asksaveasfilename(title="Sauvegarder le QRCode", initialfile=str(self.row[1])+"_QRCode.png", filetypes=[("PNG Images", "*.png")])
-        qr = qrcode.make(str(self.id)+";1")
-        qr.save(filepath)
+        if(filepath):
+            qr = qrcode.make(str(self.id)+";1")
+            qr.save(filepath)
 
-        app.update_tableau()
-        self.destroy()
         
 class App(customtkinter.CTk):
     """
@@ -493,13 +493,14 @@ class App(customtkinter.CTk):
         if self.json_window is None or not self.json_window.winfo_exists():
             # Ouvre un explorateur de fichier pour ouvrir le fichier JSON 
             # et le passer en argument pour JsonWindow
-            file = fd.askopenfile(title="Ouvrir le JSON", filetypes=[("JSON Files", "*.json")])
-            jsonFile = json.load(file)
-            if(file != None):
-                if(checkJsonFormat(jsonFile)):
-                    self.json_window = JsonWindow(self, jsonFile)
-                else:
-                    showerror("Erreur JSON", "Le Fichier JSON n'est pas conforme")
+            filename = fd.askopenfile(title="Ouvrir le JSON", filetypes=[("JSON Files", "*.json")])
+            if(filename):
+                jsonFile = json.load(filename)
+                if(filename != None):
+                    if(checkJsonFormat(jsonFile)):
+                        self.json_window = JsonWindow(self, jsonFile)
+                    else:
+                        showerror("Erreur JSON", "Le Fichier JSON n'est pas conforme")
         else:
             self.json_window.focus() 
         
@@ -532,7 +533,10 @@ class App(customtkinter.CTk):
         """
 
         # Ouvre un flux de réception Vidéo
-        cap = cv2.VideoCapture(0) 
+        cap = cv2.VideoCapture(0)
+        if cap is None or not cap.isOpened():
+            showerror("Erreur Video", "Aucun flux vidéo disponible !")
+            return
         # initialise le cv2 QRCode detector 
         detector = cv2.QRCodeDetector()
         # variable contenant le message du QRCode
