@@ -9,7 +9,7 @@ from pathlib import Path
 import cv2 
 import qrcode
 from playsound import playsound
-import requests
+import pyodbc
 
 def checkJsonFormat(jsonFile):
     """
@@ -27,6 +27,7 @@ def checkJsonFormat(jsonFile):
         else:
             return False
     return True
+
 def ensureDatabase():
     """
     EnsureData est une fonctione qui crée la base de donnée et la table dans le 
@@ -55,6 +56,22 @@ def ensureDatabase():
     if(len(rows) == 0):
         # Création de la table si inexistante
         CUR.execute("CREATE TABLE matable(id INTEGER PRIMARY KEY NOT NULL, name MEDIUMTEXT, amount INTEGER, price INTEGER, category MEDIUMTEXT, masse INTEGER, dimensions MEDIUMTEXT);")
+
+def getInfo():
+    """
+    valeur_total est une fonction qui calcul la sommes des prix de tous les éléments dans la base de donnée json
+
+    Arg: fichierjson
+    Return : prixtotal de tout les
+    """
+    CUR.execute('SELECT * FROM matable')
+    rows = CUR.fetchall()
+    prixtotal=0
+
+    for article in rows:
+            prixtotal += article[3]*article[2]
+
+    return prixtotal, len(rows)
 
 class AddWindow(customtkinter.CTkToplevel):
     """
@@ -445,6 +462,14 @@ class App(customtkinter.CTk):
         self.filter_frame.columnconfigure(0, minsize=485)
         self.filter_frame.columnconfigure(1, minsize=100)
         self.filter_frame.columnconfigure(1, minsize=100)
+
+        # Widget Scrollable pour afficher les items de la DB
+        self.info_view = customtkinter.CTkFrame(self.home_frame, height=30, fg_color="transparent")
+        self.info_view.pack(fill=customtkinter.X, side="bottom")
+
+        self.info_total = getInfo()
+        customtkinter.CTkLabel(self.info_view, text=f"Valeur Totale : {self.info_total[0]} €").grid(row=0, column=0)
+        customtkinter.CTkLabel(self.info_view, text=f"Nbr Items : {self.info_total[1]} €").grid(row=0, column=1)
 
         # Widget Scrollable pour afficher les items de la DB
         self.list_view = customtkinter.CTkScrollableFrame(self.home_frame, height=590, fg_color="transparent")
