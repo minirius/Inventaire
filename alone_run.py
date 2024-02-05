@@ -487,7 +487,7 @@ class App(customtkinter.CTk):
         self.export_button.grid(row=3, column=0, sticky="ew")
 
         # Bouton Scanner
-        self.scanner_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Scanner", fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"), anchor="w", command=self.readQRCode)
+        self.scanner_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Scanner", fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"), anchor="w", command=self.choosescan)
         self.scanner_button.grid(row=4, column=0, sticky="ew")
 
         # Bouton Effacer
@@ -549,6 +549,15 @@ class App(customtkinter.CTk):
         self.list_view = customtkinter.CTkScrollableFrame(self.home_frame, height=590, fg_color="transparent")
         self.list_view.pack(fill=customtkinter.BOTH)
     
+    def choosescan(self):
+        choose = customtkinter.CTkToplevel()
+        choose.title("Scanner quoi")
+        qrbutton = customtkinter.CTkButton(choose,text="QRcode", command=self.readQRCode)
+        qrbutton.pack()
+        barbutton = customtkinter.CTkButton(choose,text="Code barre", command=self.readbarcode)
+        barbutton.pack()
+
+
     def find_categories(self):
         # Cette fonction parcour les catégories et les retourne dans une liste
         temp_categories = ["(Catégorie)"]
@@ -652,15 +661,12 @@ class App(customtkinter.CTk):
             return
         # initialise le cv2 QRCode detector 
         detector = cv2.QRCodeDetector()
-        detector2 = cv2.BarcodeDetector()
         # variable contenant le message du QRCode
         temp_data=""
         while True: 
             _, img = cap.read()
             # detecte and decode un possible CodeQR
             data, bbox, _ = detector.detectAndDecode(img)
-            if(data=="" or data==None):
-                _, data, _, _ = detector2.detectAndDecode(img)
             # Teste si il y a bien un code QR sur l'image
             # Si oui stocke la valeur dans temp_data
             if data: 
@@ -694,6 +700,64 @@ class App(customtkinter.CTk):
 
         # Mise à jour du tableau
         self.update_tableau()
+
+    def readbarcode(self):
+        """
+        Cette fonction permet de lire les codes barre et changer les variables dans la DB
+        Peut lire des codes barres sous la forme : Index;Nbr
+        avec: - Index = Id de l'element à modifier dans la DB
+              - Nbr = nombre de quantité à soustraire
+    
+        Cette fonctione utilise la camera de l'utilisateur
+        """
+
+        # Ouvre un flux de réception Vidéo
+        cap = cv2.VideoCapture(0)
+        if cap is None or not cap.isOpened():
+            showerror("Erreur Video", "Aucun flux vidéo disponible !")
+            return
+        # initialise le cv2 BarCode detector
+        detector2 = cv2.barcode.BarcodeDetector()
+        # variable contenant le message du BarCode
+        temp_data=""
+        while True: 
+            _, img = cap.read()
+            # detecte and decode un possible Code barres
+            data, re, rt = detector2.detectAndDecode(img)
+            # Teste si il y a bien un code barres sur l'image
+            # Si oui stocke la valeur dans temp_data
+            print(re, rt, data)
+            if data: 
+                temp_data=data 
+                break
+        
+            # Affiche le Stream Vidéo
+            cv2.imshow("Scanner", img)     
+            # Permet d'arrêter le stream vidéo à l'appuie de la barre espace
+            if cv2.waitKey(1) == ord(" "): 
+                break
+        
+        # Arrête le flux vidéo et ferme la fenêtre de flux
+        cap.release() 
+        cv2.destroyAllWindows()
+
+        if(temp_data != ""):
+            # Séparer l'ID du Nbr
+            id=temp_data
+            # Parcour et obtient la quantité liée à l'ID
+            CUR.execute('SELECT * FROM matable WHERE id=?', (id, ))
+            row = CUR.fetchall()[0]
+            # Soutraction
+            newAmount = int(row[2]) - 1
+            if(newAmount < 0): newAmount = 0
+            # Update en DB
+            CON.execute('UPDATE matable set amount=? WHERE id=?', (newAmount, id, ))
+            CON.commit()
+            playsound('sound.mp3')
+
+        # Mise à jour du tableau
+        self.update_tableau()
+
 
     def deleteDatabase(self):
         if askokcancel(title="Suppression de la Base de Données", message="Etes-vous sûr de vouloir supprimer tous les élements de la base de données, cette action est irreversible. Si c'est le cas, il est recommendé d'exporter d'abord la base de données à l'aide du bouton exporter"):
