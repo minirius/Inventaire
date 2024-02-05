@@ -9,14 +9,7 @@ from pathlib import Path
 import cv2 
 import qrcode
 from playsound import playsound
-from tkinter.ttk import Combobox
-from tkinter import Label
-from tkinter import Listbox, END, StringVar, IntVar
-from functools import reduce
-from tkinter.messagebox import showinfo
-from tkinter.messagebox import askyesno
-
-import pickle
+import pyodbc
 
 def checkJsonFormat(jsonFile):
     """
@@ -28,23 +21,8 @@ def checkJsonFormat(jsonFile):
     Return : Bool : if the Json is valid
     """
     for i, row in enumerate(jsonFile):
-        if (len(row) == 7 and 
-            "id" in row and 
-            "name" in row and 
-            "amount" in row and 
-            "price" in row and 
-            "category" in row and 
-            "masse" in row and 
-            "dimensions" in row
-        ):
-            if not (type(row["id"]) == int and 
-                    type(row["name"]) == str and 
-                    type(row["amount"]) == int and 
-                    type(row["price"]) == int and 
-                    type(row["category"]) == str and 
-                    type(row["masse"]) == int and 
-                    type(row["dimensions"]) == str
-                ):
+        if (len(row) == 7 and "id" in row and "name" in row and "amount" in row and "price" in row and "category" in row and "masse" in row and "dimensions" in row):
+            if not (type(row["id"]) == int and type(row["name"]) == str and type(row["amount"]) == int and type(row["price"]) == int and type(row["category"]) == str and type(row["masse"]) == int and type(row["dimensions"]) == str):
                 return False
         else:
             return False
@@ -75,17 +53,16 @@ def ensureDatabase():
     # Recherche de la table matable, qui stockera les données
     CUR.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='matable';")
     rows = CUR.fetchall()
-
     if(len(rows) == 0):
         # Création de la table si inexistante
         CUR.execute("CREATE TABLE matable(id INTEGER PRIMARY KEY NOT NULL, name MEDIUMTEXT, amount INTEGER, price INTEGER, category MEDIUMTEXT, masse INTEGER, dimensions MEDIUMTEXT);")
 
 def getInfo():
     """
-    getInfo est une fonction qui calcul la sommes des prix de tous les éléments dans la base de donnée json
+    valeur_total est une fonction qui calcul la sommes des prix de tous les éléments dans la base de donnée json
 
     Arg: fichierjson
-    Return : Tuple contenant la somme des prix de tous les éléments et le nombre total d'articles.
+    Return : prixtotal de tout les
     """
     CUR.execute('SELECT * FROM matable')
     rows = CUR.fetchall()
@@ -167,28 +144,9 @@ class AddWindow(customtkinter.CTkToplevel):
         self.grid_rowconfigure([0, 1, 2, 3, 4, 5], minsize=50)
 
     def save(self):
-        """
-        Enregistre les valeurs des champs d'entrée dans la base de données.
-        """
         # Requête SQL pour ajouter les valeur des inputs (via les StringVar) dans notre table matable
-        if(
-            self.amount_string.get().isnumeric() and 
-           self.price_string.get().isnumeric() and 
-           self.masse_string.get().isnumeric()
-        ):
-            CON.executemany(
-                "INSERT INTO matable (name, amount, price, category, masse, dimensions) VALUES(?, ?, ?, ?, ?, ?)",
-                [
-                    (
-                        self.name_string.get(), 
-                        self.amount_string.get(), 
-                        self.price_string.get(), 
-                        self.category_string.get(), 
-                        self.masse_string.get(), 
-                        self.dimensions_string.get()
-                    )
-                ]
-            )
+        if(self.amount_string.get().isdigit() and self.price_string.get().isdigit() and self.masse_string.get().isdigit()):
+            CON.executemany("INSERT INTO matable (name, amount, price, category, masse, dimensions) VALUES(?, ?, ?, ?, ?, ?)",[(self.name_string.get(), self.amount_string.get(), self.price_string.get(), self.category_string.get(), self.masse_string.get(), self.dimensions_string.get())])
             CON.commit()
             # Actualisation du tableau de la Fenêter Parent
             app.update_tableau()
@@ -291,18 +249,11 @@ class JsonWindow(customtkinter.CTkToplevel):
         Args :
             - jsonData (2D list)
         """
+        temp_liste = [(row["name"], row["amount"], row["price"], row["category"], row["masse"], row["dimensions"]) for row in jsonData]
         # Suppression de la table actuelles
         CON.execute("DELETE FROM matable;")
         # Ajout de tout les items via la fonction executemany
-        CON.executemany(
-            "INSERT INTO matable (name, amount, price, category, masse, dimensions) VALUES(?, ?, ?, ?, ?, ?)",
-            [(row["name"], 
-              row["amount"], 
-              row["price"], 
-              row["category"], 
-              row["masse"], 
-              row["dimensions"]) for row in jsonData]
-        )
+        CON.executemany("INSERT INTO matable (name, amount, price, category, masse, dimensions) VALUES(?, ?, ?, ?, ?, ?)",temp_liste)
         CON.commit()
         # Actualisation du tableau de la fenêtre Parent
         app.update_tableau()
@@ -393,31 +344,15 @@ class EditWindow(customtkinter.CTkToplevel):
         self.grid_rowconfigure([0, 1, 2, 3, 4, 5], minsize=50)
 
     def save(self):
-        if(
-            self.amount_string.get().isdigit() and 
-           self.price_string.get().isdigit() and 
-           self.masse_string.get().isdigit()
-        ):
+        if(self.amount_string.get().isdigit() and self.price_string.get().isdigit() and self.masse_string.get().isdigit()):
             # Fonction Save, update dans la base de données à l'aide des stringVar
-            CON.execute(
-                'UPDATE matable set name=?, amount=?, price=?, category=?, masse=?, dimensions=? WHERE id=?',
-                (
-                    self.name_string.get(), 
-                    self.amount_string.get(), 
-                    self.price_string.get(), 
-                    self.category_string.get(), 
-                    self.id,
-                    self.masse_string.get(), 
-                    self.dimensions_string.get(),
-                )
-            )
+            CON.execute('UPDATE matable set name=?, amount=?, price=?, category=?, masse=?, dimensions=? WHERE id=?', (self.name_string.get(), self.amount_string.get(), self.price_string.get(), self.category_string.get(), self.id, self.masse_string.get(), self.dimensions_string.get(),))
             CON.commit()
 
             app.update_tableau()
             self.destroy()
         else:
             showerror("Type Erreur", "Veuillez rentrer des valeurs chiffrées pour : Prix et Quantité")
-
     def delete(self):
         # Supprime l'items de la base de données
         CON.execute('DELETE FROM matable WHERE id=?', (self.id, ))
@@ -428,14 +363,11 @@ class EditWindow(customtkinter.CTkToplevel):
     
     def qrcode(self):
         # Crée un code QR
-        filepath = fd.asksaveasfilename(
-            title="Sauvegarder le QRCode", 
-            initialfile=str(self.row[1])+"_QRCode.png", 
-            filetypes=[("PNG Images", "*.png")]
-        )
+        filepath = fd.asksaveasfilename(title="Sauvegarder le QRCode", initialfile=str(self.row[1])+"_QRCode.png", filetypes=[("PNG Images", "*.png")])
         if(filepath):
             qr = qrcode.make(str(self.id)+";1")
             qr.save(filepath)
+
         
 class App(customtkinter.CTk):
     """
@@ -467,7 +399,7 @@ class App(customtkinter.CTk):
         # Création de la Div Navigation
         self.navigation_frame = customtkinter.CTkFrame(self, corner_radius=0)
         self.navigation_frame.grid(row=0, column=0, sticky="nsew")
-        self.navigation_frame.grid_rowconfigure(7, weight=1)
+        self.navigation_frame.grid_rowconfigure(6, weight=1)
 
         # Logo Textuel de l'application
         self.navigation_frame_label = customtkinter.CTkLabel(self.navigation_frame, text="Inventaire",
@@ -494,13 +426,9 @@ class App(customtkinter.CTk):
         self.effacer_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Effacer", fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"), anchor="w", command=self.deleteDatabase)
         self.effacer_button.grid(row=5, column=0, sticky="ew")
 
-        # Bouton Gérer le Conteneur
-        self.container_button = customtkinter.CTkButton(self.navigation_frame, corner_radius=0, height=40, border_spacing=10, text="Gérer le Conteneur", fg_color="transparent", text_color=("gray10", "gray90"), hover_color=("gray70", "gray30"), anchor="w", command=self.openContainerWindow)
-        self.container_button.grid(row=6, column=0, sticky="ew")
-
         # Dropdown pour le thème 
         self.appearance_mode_menu = customtkinter.CTkOptionMenu(self.navigation_frame, values=["System", "Light", "Dark"], command=self.change_appearance_mode_event)
-        self.appearance_mode_menu.grid(row=7, column=0, padx=20, pady=20, sticky="s")
+        self.appearance_mode_menu.grid(row=6, column=0, padx=20, pady=20, sticky="s")
 
         # Création du Home 
         self.home_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
@@ -541,9 +469,7 @@ class App(customtkinter.CTk):
 
         self.info_total = getInfo()
         customtkinter.CTkLabel(self.info_view, text=f"Valeur Totale : {self.info_total[0]} €").grid(row=0, column=0)
-        customtkinter.CTkLabel(self.info_view, text=f"Nbr Items : {self.info_total[1]}").grid(row=0, column=1)
-        self.info_view.grid_columnconfigure(0, minsize=400)
-        self.info_view.grid_columnconfigure(1, minsize=400)
+        customtkinter.CTkLabel(self.info_view, text=f"Nbr Items : {self.info_total[1]} €").grid(row=0, column=1)
 
         # Widget Scrollable pour afficher les items de la DB
         self.list_view = customtkinter.CTkScrollableFrame(self.home_frame, height=590, fg_color="transparent")
@@ -562,26 +488,12 @@ class App(customtkinter.CTk):
         return temp_categories
 
     def categorieMenuHandle(self, categorie):
-        """
-        Fonction appelée lorsque l'utilisateur sélectionne une catégorie dans le menu déroulant.
-
-        Args: categorie (str): La catégorie sélectionnée par l'utilisateur.
-
-        Returns: None
-        """
         # On modifie la Variable selected_categorie de self.
         self.selected_categorie = categorie
         # On rafraichi l'affichage
         self.update_tableau()
     
     def triMenuHandle(self, tri):
-        """
-        Fonction appelée lorsque l'utilisateur sélectionne une option de tri dans le menu déroulant.
-
-        Args: tri (str): L'option de tri sélectionnée par l'utilisateur.
-
-        Returns: None
-        """
         # On modifie la Variable selected_categorie de self.
         self.selected_tri = tri
         # On rafraichi l'affichage
@@ -652,15 +564,12 @@ class App(customtkinter.CTk):
             return
         # initialise le cv2 QRCode detector 
         detector = cv2.QRCodeDetector()
-        detector2 = cv2.BarcodeDetector()
         # variable contenant le message du QRCode
         temp_data=""
         while True: 
             _, img = cap.read()
             # detecte and decode un possible CodeQR
-            data, bbox, _ = detector.detectAndDecode(img)
-            if(data=="" or data==None):
-                _, data, _, _ = detector2.detectAndDecode(img)
+            data, bbox, _ = detector.detectAndDecode(img) 
             # Teste si il y a bien un code QR sur l'image
             # Si oui stocke la valeur dans temp_data
             if data: 
@@ -699,10 +608,6 @@ class App(customtkinter.CTk):
         if askokcancel(title="Suppression de la Base de Données", message="Etes-vous sûr de vouloir supprimer tous les élements de la base de données, cette action est irreversible. Si c'est le cas, il est recommendé d'exporter d'abord la base de données à l'aide du bouton exporter"):
             CON.execute("DELETE FROM matable")
             CON.commit()
-
-    def openContainerWindow(self):
-        # Ouvre la fenêtre de gestion du conteneur
-        ContainerWindow(self)
 
     def update_tableau(self, e=None, i=None, a=None):
         """
@@ -771,306 +676,9 @@ class App(customtkinter.CTk):
         self.list_view.grid_columnconfigure(3, minsize=200)
         self.list_view.grid_columnconfigure(4, minsize=100)
 
+    #Permet de changer l'apparence de l'application
     def change_appearance_mode_event(self, new_appearance_mode):
-        #Permet de changer l'apparence de l'application
         customtkinter.set_appearance_mode(new_appearance_mode)
-
-class ContainerWindow(customtkinter.CTkToplevel):
-    dimensions_validated = False
-
-    def __init__(self, parent):
-        super().__init__()
-
-        # Configuration de la fenêtre
-        self.title("Gérer le Conteneur")
-        self.geometry("400x350")
-
-        # Ajout des widgets pour les dimensions et les fonctionnalités de gestion du conteneur
-        self.dimensions_label = customtkinter.CTkLabel(self, text="Dimensions du Conteneur", fg_color="transparent")
-        self.dimensions_entry = customtkinter.CTkEntry(self, placeholder_text="Ex : 150x45x30")
-        self.dimensions_label.pack()
-        self.dimensions_entry.pack()
-
-        self.validate_button = customtkinter.CTkButton(self, text="Valider les Dimensions", command=self.validateDimensions)
-        self.validate_button.pack()
-
-        self.add_item_button = customtkinter.CTkButton(self, text="Ajouter un Article", command=self.addArticle)
-        self.add_item_button.pack()
-
-        self.remove_item_button = customtkinter.CTkButton(self, text="Supprimer un Article", command=self.removeArticle)
-        self.remove_item_button.pack()
-
-        self.clear_container_button = customtkinter.CTkButton(self, text="Vider le Conteneur", command=self.clearContainer)
-        self.clear_container_button.pack()
-
-        # Liste des articles disponibles (vous devez remplacer cela par votre propre liste)
-        self.available_articles = self.retrieveAvailableArticles()
-
-        # Liste des articles ajoutés au conteneur
-        self.container_articles = []
-
-        # Dimensions du conteneur
-        self.container_dimensions = None
-
-        # Étiquette pour afficher l'espace restant dans le conteneur
-        self.remaining_space_label = Label(self, text="Espace restant dans le conteneur :")
-        self.remaining_space_label.pack()
-
-        # Listebox pour afficher les articles dans le conteneur
-        self.container_listbox = Listbox(self, selectmode="single", height=5, width=50)
-        self.container_listbox.pack()
-
-        self.updateContainerListbox()
-        self.updateRemainingSpaceLabel()
-
-    def retrieveAvailableArticles(self):
-        # Récupérer les articles directement de la base de données matable
-        CUR.execute('SELECT id, name, amount, dimensions FROM matable')
-        rows = CUR.fetchall()
-        available_articles = [{"id": row[0], "name": row[1], "amount": row[2], "dimensions": row[3].split('x')} for row in rows]
-        return available_articles
-
-    def validateDimensions(self):
-        # Valider les dimensions du conteneur
-        dimensions_input = self.dimensions_entry.get()
-        try:
-            self.container_dimensions = list(map(int, dimensions_input.split('x')))
-            print(f"Dimensions du conteneur validées : {self.container_dimensions}")
-    
-            # Mettre à jour la variable de classe pour indiquer que les dimensions sont validées
-            ContainerWindow.dimensions_validated = True
-    
-            # Désactiver le widget d'entrée des dimensions
-            self.dimensions_entry.configure(state='disabled')
-            
-            # Désactiver le bouton de validation des dimensions
-            self.validate_button.configure(state='disabled')
-        except ValueError:
-            showerror("Erreur de Dimensions", "Veuillez entrer des dimensions valides (séparées par 'x').")
-
-    def addArticle(self):
-        # Vérifier si les dimensions du conteneur ont été validées
-        if self.container_dimensions is None:
-            showerror("Erreur d'Opération", "Veuillez d'abord valider les dimensions du conteneur.")
-            return
-
-        # Ouvrir une fenêtre pour sélectionner un article
-        selected_article = self.selectArticle()
-
-        if selected_article:
-            # Calculer l'espace restant dans le conteneur
-            remaining_space = self.calculateRemainingSpace()
-
-            # Calculer l'espace nécessaire pour la quantité demandée de l'article
-            space_required = selected_article["quantity"] * self.calculateArticleVolume(selected_article)
-
-            # Vérifier si l'espace restant est suffisant
-            if remaining_space >= space_required:
-                # Vérifier si l'article est déjà présent dans le conteneur
-                existing_article = next((article for article in self.container_articles if article["id"] == selected_article["id"]), None)
-
-                if existing_article:
-                    # Si l'article existe déjà, augmenter la quantité
-                    existing_article["quantity"] += selected_article["quantity"]
-                else:
-                    # Sinon, ajouter l'article au conteneur
-                    self.container_articles.append(selected_article)
-
-                # Mettre à jour l'affichage de la Listbox
-                self.updateContainerListbox()
-
-                # Mettre à jour l'espace restant dans le conteneur
-                self.updateRemainingSpaceLabel()
-            else:
-                showerror("Erreur d'Espace", "Il n'y a pas assez d'espace disponible dans le conteneur pour cette quantité d'articles.")
-
-    def removeArticle(self):
-        # Vérifier si des articles sont présents dans le conteneur
-        if not self.container_articles:
-            showinfo("Information", "Le conteneur est vide.")
-            return
-
-        # Sélectionner l'article à supprimer
-        selected_index = self.container_listbox.curselection()
-        if not selected_index:
-            showerror("Erreur de Sélection", "Veuillez sélectionner un article à supprimer.")
-            return
-
-        # Récupérer l'index de l'article sélectionné
-        selected_index = selected_index[0]
-
-        # Retirer l'article du conteneur
-        removed_article = self.container_articles.pop(selected_index)
-
-        # Mettre à jour l'affichage de la Listbox
-        self.updateContainerListbox()
-
-        # Mettre à jour l'espace restant dans le conteneur
-        self.updateRemainingSpaceLabel()
-
-        showinfo("Article Supprimé", f"L'article {removed_article['name']} a été retiré du conteneur.")
- 
-    def clearContainer(self):
-        # Vérifier si des articles sont présents dans le conteneur
-        if not self.container_articles:
-            showinfo("Information", "Le conteneur est déjà vide.")
-            return
-
-        # Demander une confirmation à l'utilisateur
-        confirmation = askyesno("Confirmation", "Voulez-vous vraiment vider le conteneur de tous les articles ?")
-
-        if confirmation:
-            # Vider le conteneur
-            self.container_articles = []
-
-            # Mettre à jour l'affichage de la Listbox
-            self.updateContainerListbox()
-
-            # Mettre à jour l'espace restant dans le conteneur
-            self.updateRemainingSpaceLabel()
-
-            showinfo("Conteneur Vidé", "Le conteneur a été vidé de tous les articles.")
-
-    def updateRemainingSpaceLabel(self):
-        # Calculer l'espace restant dans le conteneur
-        remaining_space = self.calculateRemainingSpace()
-
-        # Mettre à jour le texte de l'étiquette
-        self.remaining_space_label.configure(text=f"Espace restant dans le conteneur : {remaining_space} cm3")
-
-    def calculateRemainingSpace(self):
-        # Vérifier si les dimensions du conteneur ont été validées
-        if self.container_dimensions is None:
-            print("Veuillez d'abord valider les dimensions du conteneur.")
-            return 0  # Ou une autre valeur par défaut appropriée
-
-        # Convertir les dimensions du conteneur en entiers
-        container_dimensions = [int(dim) for dim in self.container_dimensions]
-
-        # Calculer le volume total du conteneur
-        total_volume = reduce(lambda x, y: x * y, container_dimensions)
-
-        # Calculer le volume occupé par les articles dans le conteneur
-        occupied_volume = 0
-        for article in self.container_articles:
-            # Convertir les dimensions de l'article en entiers
-            article_dimensions = [int(dim) for dim in article['dimensions']]
-            # Calculer le volume de l'article en tenant compte de la quantité
-            article_volume = reduce(lambda x, y: x * y, article_dimensions) * article['quantity']
-            occupied_volume += article_volume
-
-        # Calculer l'espace restant
-        remaining_space = total_volume - occupied_volume
-
-        print(f"Volume total du conteneur : {total_volume}")
-        print(f"Volume occupé par les articles : {occupied_volume}")
-        print(f"Espace restant dans le conteneur : {remaining_space}")
-        
-        # Mettre à jour l'affichage de la Listbox
-        self.updateContainerListbox()
-        return remaining_space
-
-    def calculateArticleVolume(self, article):
-        # Convertir les dimensions de l'article en entiers
-        article_dimensions = [int(dim) for dim in article['dimensions']]
-
-        # Calculer le volume de l'article
-        article_volume = reduce(lambda x, y: x * y, article_dimensions)
-
-        return article_volume
-
-    def updateContainerListbox(self):
-        # Effacer le contenu actuel de la Listbox
-        self.container_listbox.delete(0, END)
-
-        # Ajouter les articles actuellement dans le conteneur à la Listbox
-        for article in self.container_articles:
-            article_info = f"{article['name']} - Quantité: {article['quantity']}"
-            self.container_listbox.insert(END, article_info)
-
-    def selectArticle(self):
-        # Liste des noms d'articles disponibles
-        available_articles = [article for article in self.available_articles if article["amount"] > 0]
-
-        if not available_articles:
-            showerror("Erreur de Sélection", "Aucun article disponible.")
-            return None
-
-        # Boîte de dialogue pour la sélection de l'article et de la quantité
-        selected_article, quantity = self.createArticleDialog(available_articles)
-
-        if selected_article:
-            # Vérifier la quantité disponible
-            if selected_article["amount"] >= quantity:
-                # Décrémenter la quantité disponible de l'article
-                selected_article["amount"] -= quantity
-
-                # Ajouter l'article sélectionné à la liste des articles du conteneur avec la quantité
-                selected_article_with_quantity = selected_article.copy()
-                selected_article_with_quantity["quantity"] = quantity
-                return selected_article_with_quantity
-
-        # Mettre à jour l'affichage de la Listbox
-        self.updateContainerListbox()
-        # Si aucun article n'est sélectionné ou s'il n'y en a pas en quantité suffisante
-        showerror("Erreur de Sélection", "Aucun article sélectionné ou quantité insuffisante.")
-        return None
-
-    def createArticleDialog(self, available_articles):
-        dialog = customtkinter.CTkToplevel(self)
-
-        # Ajouter une liste déroulante pour la sélection de l'article
-        article_var = StringVar(dialog)
-        article_var.set(available_articles[0]["name"])
-        article_dropdown = Combobox(dialog, textvariable=article_var, values=[article["name"] for article in available_articles])
-        article_dropdown.pack()
-
-        # Ajouter une entrée pour la sélection de la quantité
-        quantity_label = customtkinter.CTkLabel(dialog, text="Quantité :")
-        quantity_label.pack()
-
-        quantity_var = IntVar(dialog)
-        quantity_var.set(1)
-        quantity_entry = customtkinter.CTkEntry(dialog, textvariable=quantity_var)
-        quantity_entry.pack()
-
-        # Ajouter un bouton pour valider la sélection
-        confirm_button = customtkinter.CTkButton(dialog, text="Confirmer", command=dialog.destroy)
-        confirm_button.pack()
-
-        # Attendre la fermeture de la fenêtre de dialogue
-        dialog.wait_window()
-
-        # Récupérer la valeur sélectionnée après que la boîte de dialogue est fermée
-        selected_article_name = article_var.get()
-        quantity = quantity_var.get()
-
-        # Trouver l'article sélectionné dans la liste des articles disponibles
-        selected_article = next((article for article in available_articles if article["name"] == selected_article_name), None)
-
-        return selected_article, quantity
-
-    def createArticleDropdown(self, article_names):
-        # Créer une nouvelle fenêtre de dialogue
-        dialog = customtkinter.CTkToplevel(self)
-
-        # Ajouter une liste déroulante pour la sélection de l'article
-        article_name_var = StringVar(dialog)
-        article_name_var.set(article_names[0])
-        article_dropdown = Combobox(dialog, textvariable=article_name_var, values=article_names)
-        article_dropdown.pack()
-
-        # Ajouter un bouton pour valider la sélection
-        confirm_button = customtkinter.CTkButton(dialog, text="Confirmer", command=dialog.destroy)
-        confirm_button.pack()
-
-        # Attendre la fermeture de la fenêtre de dialogue
-        dialog.wait_window()
-
-        # Récupérer la valeur sélectionnée après que la boîte de dialogue est fermée
-        selected_article_name = article_name_var.get()
-
-        return selected_article_name
 
 if __name__ == "__main__":
     ensureDatabase()
